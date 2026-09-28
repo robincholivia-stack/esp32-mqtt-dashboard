@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ESP32 MQTT Dashboard</title>
+
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      margin: 0;
+      text-align: center;
+    }
+
+    header {
+      background: #1f2937;
+      color: white;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 30px auto;
+      padding: 20px;
+    }
+
+    .card {
+      background: white;
+      padding: 25px;
+      margin-bottom: 20px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .counter {
+      font-size: 72px;
+      font-weight: bold;
+      margin: 20px;
+    }
+
+    .connected {
+      color: green;
+      font-weight: bold;
+    }
+
+    .disconnected {
+      color: red;
+      font-weight: bold;
+    }
+
+    .topic {
+      font-family: monospace;
+      background: #eeeeee;
+      padding: 8px;
+      border-radius: 5px;
+    }
+
+    #history {
+      text-align: left;
+      max-height: 250px;
+      overflow-y: auto;
+      font-family: monospace;
+      background: #f8f8f8;
+      padding: 15px;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+  <h1>ESP32 MQTT Dashboard</h1>
+  <p>GitHub Pages + MQTT</p>
+</header>
+
+<div class="container">
+
+  <div class="card">
+    <h2>MQTT Connection</h2>
+
+    <p>
+      Status:
+      <span id="status" class="disconnected">Connecting...</span>
+    </p>
+
+    <p>
+      Topic:
+      <span id="topicName" class="topic"></span>
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>ESP32 Counter</h2>
+
+    <div id="counter" class="counter">--</div>
+
+    <p>
+      Updated:
+      <span id="updateTime">Waiting for data...</span>
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>Message History</h2>
+    <div id="history">Waiting for MQTT messages...</div>
+  </div>
+
+</div>
+
+<script>
+  const topic = "coh_dashboard/counter_topic";
+  const broker = "wss://broker.hivemq.com:8884/mqtt";
+
+  document.getElementById("topicName").textContent = topic;
+
+  const clientId =
+    "github_dashboard_" +
+    Math.random().toString(16).substring(2, 10);
+
+  const client = mqtt.connect(broker, {
+    clientId: clientId,
+    clean: true,
+    connectTimeout: 4000,
+    reconnectPeriod: 2000
+  });
+
+  client.on("connect", function () {
+    const status = document.getElementById("status");
+
+    status.textContent = "Connected";
+    status.className = "connected";
+
+    client.subscribe(topic, function (err) {
+      if (err) {
+        console.log("Subscription error:", err);
+      } else {
+        console.log("Subscribed to:", topic);
+      }
+    });
+  });
+
+  client.on("message", function (receivedTopic, message) {
+    const value = message.toString();
+    const now = new Date();
+
+    document.getElementById("counter").textContent = value;
+    document.getElementById("updateTime").textContent =
+      now.toLocaleTimeString();
+
+    const history = document.getElementById("history");
+
+    if (history.textContent.includes("Waiting for MQTT messages")) {
+      history.textContent = "";
+    }
+
+    const newMessage = document.createElement("div");
+
+    newMessage.textContent =
+      now.toLocaleTimeString() +
+      " | " +
+      receivedTopic +
+      " -> " +
+      value;
+
+    history.prepend(newMessage);
+  });
+
+  client.on("error", function (error) {
+    console.log("MQTT Error:", error);
+
+    const status = document.getElementById("status");
+    status.textContent = "Connection Error";
+    status.className = "disconnected";
+  });
+
+  client.on("offline", function () {
+    const status = document.getElementById("status");
+    status.textContent = "Disconnected";
+    status.className = "disconnected";
+  });
+</script>
+
+</body>
+</html>
