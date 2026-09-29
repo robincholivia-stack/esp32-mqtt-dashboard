@@ -138,13 +138,13 @@
     </div>
   </div>
 
-  <!-- Message Information with Device ID -->
+  <!-- Message Information -->
   <div class="card">
     <h2>Message Information</h2>
     <p>Device: <strong id="deviceId">Waiting...</strong></p>
     <p>Message #: <strong id="sequenceNumber">0</strong></p>
     <p>ESP32 Uptime: <strong id="deviceUptime">0 ms</strong></p>
-    <p>Message Counter: <strong id="messageCounter">0</strong></p>
+    <p>Dashboard Counter: <strong id="messageCounter">0</strong></p>
     <p>Last Message: <strong id="messageTime">Waiting for data...</strong></p>
   </div>
 
@@ -156,7 +156,7 @@
     <h3>LED Status: <span id="ledStatus" style="color: #6b7280;">Unknown</span></h3>
   </div>
 
-  <!-- History Log -->
+  <!-- Message History -->
   <div class="card">
     <h2>Message History</h2>
     <div id="history">Waiting for MQTT messages...</div>
@@ -201,36 +201,34 @@
       try {
         const data = JSON.parse(value);
 
-        // Update Device Name
         if (data.device) {
           document.getElementById("deviceId").innerText = data.device;
         }
 
         if (typeof data.sequence === "number") {
-      document.getElementById("sequenceNumber").innerText = data.sequence;
-    }
+          document.getElementById("sequenceNumber").innerText = data.sequence;
+        }
+
         if (typeof data.timestamp === "number") {
-      const uptimeSeconds = (data.timestamp / 1000).toFixed(1);
-      document.getElementById("deviceUptime").innerText = `${data.timestamp} ms (${uptimeSeconds}s)`;
-    }
-
-        // Update Temperature
-        if (typeof data.temperature === "number") {
-          document.getElementById("temperature").innerText = data.temperature + " °C";
+          const uptimeSeconds = (data.timestamp / 1000).toFixed(1);
+          document.getElementById("deviceUptime").innerText = `${data.timestamp} ms (${uptimeSeconds}s)`;
         }
 
-        // Update Humidity
-        if (typeof data.humidity === "number") {
-          document.getElementById("humidity").innerText = data.humidity + " %";
-        }
-
-        // Update Light
-        if (typeof data.light === "number") {
-          document.getElementById("light").innerText = data.light;
+        // Accessing nested sensor objects safely
+        if (data.sensors) {
+          if (typeof data.sensors.temperature === "number") {
+            document.getElementById("temperature").innerText = data.sensors.temperature + " °C";
+          }
+          if (typeof data.sensors.humidity === "number") {
+            document.getElementById("humidity").innerText = data.sensors.humidity + " %";
+          }
+          if (typeof data.sensors.light === "number") {
+            document.getElementById("light").innerText = data.sensors.light;
+          }
         }
 
       } catch(error) {
-        console.log("JSON Parsing Error:", error);
+        console.error("JSON Error:", error);
       }
     } else if (topic === ledStatusTopic) {
       const ledStatusElem = document.getElementById("ledStatus");
@@ -261,7 +259,7 @@
   }
 
   client.on("error", function(error) {
-    console.log("MQTT Error:", error);
+    console.error("MQTT Error:", error);
     const status = document.getElementById("status");
     status.textContent = "Connection Error";
     status.className = "disconnected";
