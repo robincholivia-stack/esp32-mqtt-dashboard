@@ -143,6 +143,7 @@
     <h2>Message Information</h2>
     <p>Device: <strong id="deviceId">Waiting...</strong></p>
     <p>Message #: <strong id="sequenceNumber">0</strong></p>
+    <p>ESP32 Uptime: <strong id="deviceUptime">0 ms</strong></p>
     <p>Message Counter: <strong id="messageCounter">0</strong></p>
     <p>Last Message: <strong id="messageTime">Waiting for data...</strong></p>
   </div>
@@ -207,6 +208,10 @@
 
         if (typeof data.sequence === "number") {
       document.getElementById("sequenceNumber").innerText = data.sequence;
+    }
+        if (typeof data.timestamp === "number") {
+      const uptimeSeconds = (data.timestamp / 1000).toFixed(1);
+      document.getElementById("deviceUptime").innerText = `${data.timestamp} ms (${uptimeSeconds}s)`;
     }
 
         // Update Temperature
