@@ -1,23 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8">
-
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
-  >
-
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ESP32 MQTT Dashboard</title>
 
   <!-- MQTT.js CDN -->
-  <script
-    src="https://unpkg.com/mqtt/dist/mqtt.min.js">
-  </script>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
   <style>
-
     body {
       font-family: Arial, sans-serif;
       background: #f4f6f8;
@@ -47,10 +38,6 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
 
-    /* --------------------------------
-       Sensor Cards
-    -------------------------------- */
-
     .sensor-container {
       display: flex;
       gap: 20px;
@@ -66,28 +53,15 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
 
-    .temperature,
-    .humidity,
-    .light {
+    .temperature, .humidity, .light {
       font-size: 48px;
       font-weight: bold;
       margin: 15px;
       color: #111827;
     }
 
-    /* --------------------------------
-       Connection Status
-    -------------------------------- */
-
-    .connected {
-      color: green;
-      font-weight: bold;
-    }
-
-    .disconnected {
-      color: red;
-      font-weight: bold;
-    }
+    .connected { color: green; font-weight: bold; }
+    .disconnected { color: red; font-weight: bold; }
 
     .topic {
       font-family: monospace;
@@ -95,10 +69,6 @@
       padding: 6px 10px;
       border-radius: 5px;
     }
-
-    /* --------------------------------
-       Buttons
-    -------------------------------- */
 
     button {
       font-size: 18px;
@@ -111,27 +81,11 @@
       transition: background 0.2s;
     }
 
-    .btn-on {
-      background-color: #10b981;
-      color: white;
-    }
+    .btn-on { background-color: #10b981; color: white; }
+    .btn-on:hover { background-color: #059669; }
 
-    .btn-on:hover {
-      background-color: #059669;
-    }
-
-    .btn-off {
-      background-color: #ef4444;
-      color: white;
-    }
-
-    .btn-off:hover {
-      background-color: #dc2626;
-    }
-
-    /* --------------------------------
-       Message History
-    -------------------------------- */
+    .btn-off { background-color: #ef4444; color: white; }
+    .btn-off:hover { background-color: #dc2626; }
 
     #history {
       text-align: left;
@@ -144,685 +98,171 @@
       border: 1px solid #e5e7eb;
     }
 
-    /* --------------------------------
-       Mobile
-    -------------------------------- */
-
     @media (max-width: 700px) {
-
-      .sensor-container {
-        flex-direction: column;
-      }
-
+      .sensor-container { flex-direction: column; }
     }
-
   </style>
 </head>
-
 
 <body>
 
 <header>
-
-  <h1>
-    ESP32 MQTT Dashboard
-  </h1>
-
-  <p>
-    GitHub Pages + MQTT Control
-  </p>
-
+  <h1>ESP32 MQTT Dashboard</h1>
+  <p>GitHub Pages + MQTT Control</p>
 </header>
-
 
 <div class="container">
 
-
-  <!-- ==================================
-       MQTT Connection
-  =================================== -->
-
+  <!-- MQTT Connection Status -->
   <div class="card">
-
-    <h2>
-      MQTT Connection
-    </h2>
-
-    <p>
-
-      Status:
-
-      <span
-        id="status"
-        class="disconnected"
-      >
-        Connecting...
-      </span>
-
-    </p>
-
-
-    <p>
-
-      Sensor Topic:
-
-      <span
-        id="topicName"
-        class="topic"
-      >
-        iot/lab/coh/sensors
-      </span>
-
-    </p>
-
+    <h2>MQTT Connection</h2>
+    <p>Status: <span id="status" class="disconnected">Connecting...</span></p>
+    <p>Sensor Topic: <span id="topicName" class="topic">iot/lab/coh/sensors</span></p>
   </div>
 
-
-  <!-- ==================================
-       Temperature + Humidity + Light
-  =================================== -->
-
+  <!-- Sensor Readouts -->
   <div class="sensor-container">
-
-
-    <!-- Temperature -->
+    <div class="sensor-card">
+      <h2>Temperature</h2>
+      <div id="temperature" class="temperature">-- °C</div>
+    </div>
 
     <div class="sensor-card">
-
-      <h2>
-        Temperature
-      </h2>
-
-      <div
-        id="temperature"
-        class="temperature"
-      >
-        -- °C
-      </div>
-
+      <h2>Humidity</h2>
+      <div id="humidity" class="humidity">-- %</div>
     </div>
-
-
-    <!-- Humidity -->
 
     <div class="sensor-card">
-
-      <h2>
-        Humidity
-      </h2>
-
-      <div
-        id="humidity"
-        class="humidity"
-      >
-        -- %
-      </div>
-
+      <h2>Light</h2>
+      <div id="light" class="light">--</div>
     </div>
-
-
-    <!-- Light -->
-
-    <div class="sensor-card">
-
-      <h2>
-        Light
-      </h2>
-
-      <div
-        id="light"
-        class="light"
-      >
-        --
-      </div>
-
-    </div>
-
   </div>
 
-
-  <!-- ==================================
-       Message Information
-  =================================== -->
-
+  <!-- Message Information with Device ID -->
   <div class="card">
-
-    <h2>
-      Message Information
-    </h2>
-
-    <p>
-
-      Message Counter:
-
-      <strong id="messageCounter">
-        0
-      </strong>
-
-    </p>
-
-
-    <p>
-
-      Last Message:
-
-      <strong id="messageTime">
-        Waiting for data...
-      </strong>
-
-    </p>
-
+    <h2>Message Information</h2>
+    <p>Device: <strong id="deviceId">Waiting...</strong></p>
+    <p>Message Counter: <strong id="messageCounter">0</strong></p>
+    <p>Last Message: <strong id="messageTime">Waiting for data...</strong></p>
   </div>
 
-
-  <!-- ==================================
-       LED Control
-  =================================== -->
-
+  <!-- LED Control -->
   <div class="card">
-
-    <h2>
-      LED Control
-    </h2>
-
-
-    <button
-      class="btn-on"
-      onclick="ledOn()"
-    >
-      ON
-    </button>
-
-
-    <button
-      class="btn-off"
-      onclick="ledOff()"
-    >
-      OFF
-    </button>
-
-
-    <h3>
-
-      LED Status:
-
-      <span
-        id="ledStatus"
-        style="color: #6b7280;"
-      >
-        Unknown
-      </span>
-
-    </h3>
-
+    <h2>LED Control</h2>
+    <button class="btn-on" onclick="ledOn()">ON</button>
+    <button class="btn-off" onclick="ledOff()">OFF</button>
+    <h3>LED Status: <span id="ledStatus" style="color: #6b7280;">Unknown</span></h3>
   </div>
 
-
-  <!-- ==================================
-       Message History
-  =================================== -->
-
+  <!-- History Log -->
   <div class="card">
-
-    <h2>
-      Message History
-    </h2>
-
-
-    <div id="history">
-
-      Waiting for MQTT messages...
-
-    </div>
-
+    <h2>Message History</h2>
+    <div id="history">Waiting for MQTT messages...</div>
   </div>
 
 </div>
 
-
 <script>
-
-  // ==================================
-  // MQTT Topics
-  // ==================================
-
-  // JSON sensor topic
-  const sensorTopic =
-    "iot/lab/coh/sensors";
-
-
-  // LED command topic
-  const ledCommandTopic =
-    "iot/lab/led/set";
-
-
-  // LED status topic
-  const ledStatusTopic =
-    "iot/lab/led/status";
-
-
-  // ==================================
-  // HiveMQ WebSocket Broker
-  // ==================================
-
-  const broker =
-    "wss://broker.hivemq.com:8884/mqtt";
-
-
-  // ==================================
-  // Message Counter
-  // ==================================
+  const sensorTopic = "iot/lab/coh/sensors";
+  const ledCommandTopic = "iot/lab/led/set";
+  const ledStatusTopic = "iot/lab/led/status";
+  const broker = "wss://broker.hivemq.com:8884/mqtt";
 
   let messageCount = 0;
+  const clientId = "github_dashboard_" + Math.random().toString(16).substring(2, 10);
 
+  const client = mqtt.connect(broker, {
+    clientId: clientId,
+    clean: true,
+    connectTimeout: 4000,
+    reconnectPeriod: 2000
+  });
 
-  // ==================================
-  // MQTT Client ID
-  // ==================================
+  client.on("connect", function() {
+    const status = document.getElementById("status");
+    status.textContent = "Connected";
+    status.className = "connected";
 
-  const clientId =
-    "github_dashboard_" +
-    Math.random()
-      .toString(16)
-      .substring(2, 10);
+    client.subscribe(sensorTopic);
+    client.subscribe(ledStatusTopic);
+  });
 
+  client.on("message", function(topic, message) {
+    const value = message.toString();
+    const now = new Date();
 
-  // ==================================
-  // Connect to MQTT
-  // ==================================
+    messageCount++;
+    document.getElementById("messageCounter").innerText = messageCount;
+    document.getElementById("messageTime").innerText = now.toLocaleTimeString();
 
-  const client =
-    mqtt.connect(
-      broker,
-      {
+    if (topic === sensorTopic) {
+      try {
+        const data = JSON.parse(value);
 
-        clientId: clientId,
-
-        clean: true,
-
-        connectTimeout: 4000,
-
-        reconnectPeriod: 2000
-
-      }
-    );
-
-
-  // ==================================
-  // MQTT Connected
-  // ==================================
-
-  client.on(
-    "connect",
-    function()
-    {
-
-      const status =
-        document.getElementById(
-          "status"
-        );
-
-
-      status.textContent =
-        "Connected";
-
-
-      status.className =
-        "connected";
-
-
-      // Subscribe to JSON sensor topic
-      client.subscribe(
-        sensorTopic
-      );
-
-
-      // Subscribe to LED status
-      client.subscribe(
-        ledStatusTopic
-      );
-
-
-      console.log(
-        "Subscribed to:",
-        sensorTopic
-      );
-
-
-      console.log(
-        "Subscribed to:",
-        ledStatusTopic
-      );
-
-    }
-  );
-
-
-  // ==================================
-  // MQTT Message Received
-  // ==================================
-
-  client.on(
-    "message",
-    function(topic, message)
-    {
-
-      const value =
-        message.toString();
-
-
-      const now =
-        new Date();
-
-
-      // Increase message counter
-      messageCount++;
-
-
-      document.getElementById(
-        "messageCounter"
-      ).innerText =
-        messageCount;
-
-
-      // Update timestamp
-      document.getElementById(
-        "messageTime"
-      ).innerText =
-        now.toLocaleTimeString();
-
-
-      // ==================================
-      // JSON Sensor Message
-      // ==================================
-
-      if (
-        topic === sensorTopic
-      )
-      {
-
-        try
-        {
-
-          // Convert JSON text into JavaScript object
-          const data =
-            JSON.parse(
-              value
-            );
-
-
-          // --------------------------------
-          // Temperature
-          // --------------------------------
-
-          if (
-            typeof data.temperature
-              === "number"
-          )
-          {
-
-            document.getElementById(
-              "temperature"
-            ).innerText =
-              data.temperature +
-              " °C";
-
-          }
-
-
-          // --------------------------------
-          // Humidity
-          // --------------------------------
-
-          if (
-            typeof data.humidity
-              === "number"
-          )
-          {
-
-            document.getElementById(
-              "humidity"
-            ).innerText =
-              data.humidity +
-              " %";
-
-          }
-
-
-          // --------------------------------
-          // Light
-          // --------------------------------
-
-          if (
-            typeof data.light
-              === "number"
-          )
-          {
-
-            document.getElementById(
-              "light"
-            ).innerText =
-              data.light;
-
-          }
-
-
-          console.log(
-            "JSON received:",
-            data
-          );
-
+        // Update Device Name
+        if (data.device) {
+          document.getElementById("deviceId").innerText = data.device;
         }
 
-        catch(error)
-        {
-
-          console.log(
-            "JSON Error:",
-            error
-          );
-
+        // Update Temperature
+        if (typeof data.temperature === "number") {
+          document.getElementById("temperature").innerText = data.temperature + " °C";
         }
 
-      }
-
-
-      // ==================================
-      // LED Status
-      // ==================================
-
-      else if (
-        topic === ledStatusTopic
-      )
-      {
-
-        const ledStatusElem =
-          document.getElementById(
-            "ledStatus"
-          );
-
-
-        ledStatusElem.innerText =
-          value;
-
-
-        if (
-          value.toUpperCase()
-          === "ON"
-        )
-        {
-
-          ledStatusElem.style.color =
-            "#10b981";
-
+        // Update Humidity
+        if (typeof data.humidity === "number") {
+          document.getElementById("humidity").innerText = data.humidity + " %";
         }
 
-        else
-        {
-
-          ledStatusElem.style.color =
-            "#ef4444";
-
+        // Update Light
+        if (typeof data.light === "number") {
+          document.getElementById("light").innerText = data.light;
         }
 
+      } catch(error) {
+        console.log("JSON Parsing Error:", error);
       }
-
-
-      // ==================================
-      // Message History
-      // ==================================
-
-      const history =
-        document.getElementById(
-          "history"
-        );
-
-
-      if (
-        history.textContent.includes(
-          "Waiting for MQTT messages"
-        )
-      )
-      {
-
-        history.textContent = "";
-
-      }
-
-
-      const newMessage =
-        document.createElement(
-          "div"
-        );
-
-
-      newMessage.textContent =
-        `${now.toLocaleTimeString()} | ${topic} -> ${value}`;
-
-
-      history.prepend(
-        newMessage
-      );
-
-    }
-  );
-
-
-  // ==================================
-  // LED ON
-  // ==================================
-
-  function ledOn()
-  {
-
-    if (
-      client.connected
-    )
-    {
-
-      client.publish(
-        ledCommandTopic,
-        "ON"
-      );
-
-
-      console.log(
-        "Published: ON to " +
-        ledCommandTopic
-      );
-
+    } else if (topic === ledStatusTopic) {
+      const ledStatusElem = document.getElementById("ledStatus");
+      ledStatusElem.innerText = value;
+      ledStatusElem.style.color = (value.toUpperCase() === "ON") ? "#10b981" : "#ef4444";
     }
 
+    const history = document.getElementById("history");
+    if (history.textContent.includes("Waiting for MQTT messages")) {
+      history.textContent = "";
+    }
+
+    const newMessage = document.createElement("div");
+    newMessage.textContent = `${now.toLocaleTimeString()} | ${topic} -> ${value}`;
+    history.prepend(newMessage);
+  });
+
+  function ledOn() {
+    if (client.connected) {
+      client.publish(ledCommandTopic, "ON");
+    }
   }
 
-
-  // ==================================
-  // LED OFF
-  // ==================================
-
-  function ledOff()
-  {
-
-    if (
-      client.connected
-    )
-    {
-
-      client.publish(
-        ledCommandTopic,
-        "OFF"
-      );
-
-
-      console.log(
-        "Published: OFF to " +
-        ledCommandTopic
-      );
-
+  function ledOff() {
+    if (client.connected) {
+      client.publish(ledCommandTopic, "OFF");
     }
-
   }
 
+  client.on("error", function(error) {
+    console.log("MQTT Error:", error);
+    const status = document.getElementById("status");
+    status.textContent = "Connection Error";
+    status.className = "disconnected";
+  });
 
-  // ==================================
-  // MQTT Error
-  // ==================================
-
-  client.on(
-    "error",
-    function(error)
-    {
-
-      console.log(
-        "MQTT Error:",
-        error
-      );
-
-
-      const status =
-        document.getElementById(
-          "status"
-        );
-
-
-      status.textContent =
-        "Connection Error";
-
-
-      status.className =
-        "disconnected";
-
-    }
-  );
-
-
-  // ==================================
-  // MQTT Offline
-  // ==================================
-
-  client.on(
-    "offline",
-    function()
-    {
-
-      const status =
-        document.getElementById(
-          "status"
-        );
-
-
-      status.textContent =
-        "Disconnected";
-
-
-      status.className =
-        "disconnected";
-
-    }
-  );
-
+  client.on("offline", function() {
+    const status = document.getElementById("status");
+    status.textContent = "Disconnected";
+    status.className = "disconnected";
+  });
 </script>
 
 </body>
-
 </html>
