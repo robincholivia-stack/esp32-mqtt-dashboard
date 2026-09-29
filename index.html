@@ -26,7 +26,7 @@
     }
 
     .container {
-      max-width: 800px;
+      max-width: 1000px;
       margin: 0 auto 40px auto;
       padding: 0 20px;
     }
@@ -39,11 +39,12 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
 
-    /* Temperature + Humidity side by side */
+    /* Temperature + Humidity + Light side by side */
     .sensor-container {
       display: flex;
       gap: 20px;
       justify-content: center;
+      margin-bottom: 20px;
     }
 
     .sensor-card {
@@ -55,7 +56,8 @@
     }
 
     .temperature,
-    .humidity {
+    .humidity,
+    .light {
       font-size: 48px;
       font-weight: bold;
       margin: 15px;
@@ -120,7 +122,7 @@
     }
 
     /* Mobile layout */
-    @media (max-width: 600px) {
+    @media (max-width: 700px) {
       .sensor-container {
         flex-direction: column;
       }
@@ -151,13 +153,15 @@
     <p>
       Subscribed Topics:
       <span id="topicName" class="topic">
-        iot/lab/temperature, iot/lab/humidity
+        iot/lab/temperature,
+        iot/lab/humidity,
+        iot/lab/light
       </span>
     </p>
   </div>
 
 
-  <!-- Temperature + Humidity -->
+  <!-- Temperature + Humidity + Light -->
   <div class="sensor-container">
 
     <!-- Temperature -->
@@ -169,12 +173,23 @@
       </div>
     </div>
 
+
     <!-- Humidity -->
     <div class="sensor-card">
       <h2>Humidity</h2>
 
       <div id="humidity" class="humidity">
         -- %
+      </div>
+    </div>
+
+
+    <!-- Light -->
+    <div class="sensor-card">
+      <h2>Light</h2>
+
+      <div id="light" class="light">
+        --
       </div>
     </div>
 
@@ -243,6 +258,9 @@
 
   const humidityTopic =
     "iot/lab/humidity";
+
+  const lightTopic =
+    "iot/lab/light";
 
   const ledCommandTopic =
     "iot/lab/led/set";
@@ -315,6 +333,10 @@
     client.subscribe(humidityTopic);
 
 
+    // Subscribe to light
+    client.subscribe(lightTopic);
+
+
     // Subscribe to LED status
     client.subscribe(ledStatusTopic);
 
@@ -380,6 +402,20 @@
         "humidity"
       ).innerText =
         value + " %";
+
+    }
+
+
+    // ==========================
+    // Light
+    // ==========================
+
+    else if (topic === lightTopic) {
+
+      document.getElementById(
+        "light"
+      ).innerText =
+        value;
 
     }
 
@@ -543,4 +579,3 @@
 
 </body>
 </html>
-```
