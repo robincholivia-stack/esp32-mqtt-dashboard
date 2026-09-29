@@ -200,6 +200,7 @@
     if (topic === sensorTopic) {
       try {
         const data = JSON.parse(value);
+        clearJsonError();
 
         if (data.device) {
           document.getElementById("deviceId").innerText = data.device;
@@ -214,7 +215,6 @@
           document.getElementById("deviceUptime").innerText = `${data.timestamp} ms (${uptimeSeconds}s)`;
         }
 
-        // Accessing nested sensor objects safely
         if (data.sensors) {
           if (typeof data.sensors.temperature === "number") {
             document.getElementById("temperature").innerText = data.sensors.temperature + " °C";
@@ -227,8 +227,9 @@
           }
         }
 
-      } catch(error) {
-        console.error("JSON Error:", error);
+      } catch (error) {
+        console.warn("Invalid JSON format received:", value, error);
+        showJsonError(value);
       }
     } else if (topic === ledStatusTopic) {
       const ledStatusElem = document.getElementById("ledStatus");
@@ -245,6 +246,25 @@
     newMessage.textContent = `${now.toLocaleTimeString()} | ${topic} -> ${value}`;
     history.prepend(newMessage);
   });
+
+  function showJsonError(rawPayload) {
+    let errorBanner = document.getElementById("jsonErrorBanner");
+    if (!errorBanner) {
+      errorBanner = document.createElement("div");
+      errorBanner.id = "jsonErrorBanner";
+      errorBanner.style.cssText = "background: #fee2e2; color: #991b1b; padding: 12px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #f87171; font-weight: bold;";
+      const container = document.querySelector(".container");
+      container.insertBefore(errorBanner, container.firstChild);
+    }
+    errorBanner.innerText = `⚠️ Malformed message received: "${rawPayload}" (Ignored parsing)`;
+  }
+
+  function clearJsonError() {
+    const errorBanner = document.getElementById("jsonErrorBanner");
+    if (errorBanner) {
+      errorBanner.remove();
+    }
+  }
 
   function ledOn() {
     if (client.connected) {
