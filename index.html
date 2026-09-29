@@ -142,6 +142,7 @@
   <div class="card">
     <h2>Message Information</h2>
     <p>Device: <strong id="deviceId">Waiting...</strong></p>
+    <p>Message #: <strong id="sequenceNumber">0</strong></p>
     <p>Message Counter: <strong id="messageCounter">0</strong></p>
     <p>Last Message: <strong id="messageTime">Waiting for data...</strong></p>
   </div>
@@ -203,6 +204,10 @@
         if (data.device) {
           document.getElementById("deviceId").innerText = data.device;
         }
+
+        if (typeof data.sequence === "number") {
+      document.getElementById("sequenceNumber").innerText = data.sequence;
+    }
 
         // Update Temperature
         if (typeof data.temperature === "number") {
