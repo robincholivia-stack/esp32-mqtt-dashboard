@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ESP32 MQTT Dashboard</title>
 
+  <!-- MQTT.js CDN -->
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
   <style>
@@ -12,6 +13,7 @@
       font-family: Arial, sans-serif;
       background: #f4f6f8;
       margin: 0;
+      padding-top: 20px;
       text-align: center;
     }
 
@@ -19,12 +21,13 @@
       background: #1f2937;
       color: white;
       padding: 20px;
+      margin-bottom: 30px;
     }
 
     .container {
-      max-width: 800px;
-      margin: 30px auto;
-      padding: 20px;
+      max-width: 600px;
+      margin: 0 auto 40px auto;
+      padding: 0 20px;
     }
 
     .card {
@@ -35,10 +38,11 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
 
-    .counter {
-      font-size: 72px;
+    .counter, .temperature {
+      font-size: 48px;
       font-weight: bold;
-      margin: 20px;
+      margin: 15px;
+      color: #111827;
     }
 
     .connected {
@@ -54,18 +58,48 @@
     .topic {
       font-family: monospace;
       background: #eeeeee;
-      padding: 8px;
+      padding: 6px 10px;
       border-radius: 5px;
+    }
+
+    button {
+      font-size: 18px;
+      font-weight: bold;
+      padding: 12px 25px;
+      margin: 10px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-on {
+      background-color: #10b981;
+      color: white;
+    }
+
+    .btn-on:hover {
+      background-color: #059669;
+    }
+
+    .btn-off {
+      background-color: #ef4444;
+      color: white;
+    }
+
+    .btn-off:hover {
+      background-color: #dc2626;
     }
 
     #history {
       text-align: left;
-      max-height: 250px;
+      max-height: 200px;
       overflow-y: auto;
       font-family: monospace;
       background: #f8f8f8;
       padding: 15px;
       border-radius: 8px;
+      border: 1px solid #e5e7eb;
     }
   </style>
 </head>
@@ -74,36 +108,48 @@
 
 <header>
   <h1>ESP32 MQTT Dashboard</h1>
-  <p>GitHub Pages + MQTT</p>
+  <p>GitHub Pages + MQTT Control</p>
 </header>
 
 <div class="container">
 
+  <!-- Connection Status Card -->
   <div class="card">
     <h2>MQTT Connection</h2>
-
     <p>
       Status:
       <span id="status" class="disconnected">Connecting...</span>
     </p>
-
     <p>
-      Topic:
-      <span id="topicName" class="topic"></span>
+      Subscribed Topics:
+      <span id="topicName" class="topic">iot/lab/#</span>
     </p>
   </div>
 
+  <!-- Telemetry Card -->
   <div class="card">
-    <h2>ESP32 Counter</h2>
-
-    <div id="counter" class="counter">--</div>
-
+    <h2>Temperature Sensor</h2>
+    <div id="temperature" class="temperature">-- °C</div>
+    <div id="counter" class="counter" style="display: none;">--</div>
     <p>
-      Updated:
+      Last Updated:
       <span id="updateTime">Waiting for data...</span>
     </p>
   </div>
 
+  <!-- Control Card -->
+  <div class="card">
+    <h2>LED Control</h2>
+    <button class="btn-on" onclick="ledOn()">ON</button>
+    <button class="btn-off" onclick="ledOff()">OFF</button>
+
+    <h3>
+      LED Status: 
+      <span id="ledStatus" style="color: #6b7280;">Unknown</span>
+    </h3>
+  </div>
+
+  <!-- History Log Card -->
   <div class="card">
     <h2>Message History</h2>
     <div id="history">Waiting for MQTT messages...</div>
@@ -112,15 +158,15 @@
 </div>
 
 <script>
-  const topic = "iot/lab/temperature";
+  // MQTT Topics
+  const tempTopic = "iot/lab/temperature";
+  const ledCommandTopic = "iot/lab/led/set";
+  const ledStatusTopic = "iot/lab/led/status";
   const broker = "wss://broker.hivemq.com:8884/mqtt";
 
-  document.getElementById("topicName").textContent = topic;
+  const clientId = "github_dashboard_" + Math.random().toString(16).substring(2, 10);
 
-  const clientId =
-    "github_dashboard_" +
-    Math.random().toString(16).substring(2, 10);
-
+  // Initialize MQTT Client
   const client = mqtt.connect(broker, {
     clientId: clientId,
     clean: true,
@@ -128,50 +174,63 @@
     reconnectPeriod: 2000
   });
 
+  // Connection Event
   client.on("connect", function () {
     const status = document.getElementById("status");
-
     status.textContent = "Connected";
     status.className = "connected";
 
-    client.subscribe(topic, function (err) {
-      if (err) {
-        console.log("Subscription error:", err);
-      } else {
-        console.log("Subscribed to:", topic);
-      }
-    });
+    // Subscribe to topics
+    client.subscribe(tempTopic);
+    client.subscribe(ledStatusTopic);
+    console.log("Subscribed to MQTT topics");
   });
 
-  client.on("message", function (receivedTopic, message) {
+  // Message Handler
+  client.on("message", function (topic, message) {
     const value = message.toString();
     const now = new Date();
 
-    document.getElementById("counter").textContent = value;
-    document.getElementById("updateTime").textContent =
-      now.toLocaleTimeString();
+    // Route message based on topic
+    if (topic === tempTopic) {
+      document.getElementById("temperature").innerText = value + " °C";
+      document.getElementById("counter").innerText = value;
+      document.getElementById("updateTime").innerText = now.toLocaleTimeString();
+    } else if (topic === ledStatusTopic) {
+      const ledStatusElem = document.getElementById("ledStatus");
+      ledStatusElem.innerText = value;
+      ledStatusElem.style.color = (value.toUpperCase() === "ON") ? "#10b981" : "#ef4444";
+    }
 
+    // Append entry to message history feed
     const history = document.getElementById("history");
-
     if (history.textContent.includes("Waiting for MQTT messages")) {
       history.textContent = "";
     }
 
     const newMessage = document.createElement("div");
-
-    newMessage.textContent =
-      now.toLocaleTimeString() +
-      " | " +
-      receivedTopic +
-      " -> " +
-      value;
-
+    newMessage.textContent = `${now.toLocaleTimeString()} | ${topic} -> ${value}`;
     history.prepend(newMessage);
   });
 
+  // LED Button Functions
+  function ledOn() {
+    if (client.connected) {
+      client.publish(ledCommandTopic, "ON");
+      console.log("Published: ON to " + ledCommandTopic);
+    }
+  }
+
+  function ledOff() {
+    if (client.connected) {
+      client.publish(ledCommandTopic, "OFF");
+      console.log("Published: OFF to " + ledCommandTopic);
+    }
+  }
+
+  // Connection Error / Offline Handlers
   client.on("error", function (error) {
     console.log("MQTT Error:", error);
-
     const status = document.getElementById("status");
     status.textContent = "Connection Error";
     status.className = "disconnected";
