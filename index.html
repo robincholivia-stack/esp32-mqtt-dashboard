@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -38,7 +39,7 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
 
-    .counter, .temperature {
+    .counter, .temperature, .humidity {
       font-size: 48px;
       font-weight: bold;
       margin: 15px;
@@ -126,14 +127,23 @@
     </p>
   </div>
 
-  <!-- Telemetry Card -->
+  <!-- Temperature Card -->
   <div class="card">
     <h2>Temperature Sensor</h2>
     <div id="temperature" class="temperature">-- °C</div>
-    <div id="counter" class="counter" style="display: none;">--</div>
     <p>
       Last Updated:
       <span id="updateTime">Waiting for data...</span>
+    </p>
+  </div>
+
+  <!-- Humidity Card -->
+  <div class="card">
+    <h2>Humidity Sensor</h2>
+    <div id="humidity" class="humidity">-- %</div>
+    <p>
+      Last Updated:
+      <span id="humidityUpdateTime">Waiting for data...</span>
     </p>
   </div>
 
@@ -144,7 +154,7 @@
     <button class="btn-off" onclick="ledOff()">OFF</button>
 
     <h3>
-      LED Status: 
+      LED Status:
       <span id="ledStatus" style="color: #6b7280;">Unknown</span>
     </h3>
   </div>
@@ -160,11 +170,15 @@
 <script>
   // MQTT Topics
   const tempTopic = "iot/lab/temperature";
+  const humidityTopic = "iot/lab/humidity";
   const ledCommandTopic = "iot/lab/led/set";
   const ledStatusTopic = "iot/lab/led/status";
+
   const broker = "wss://broker.hivemq.com:8884/mqtt";
 
-  const clientId = "github_dashboard_" + Math.random().toString(16).substring(2, 10);
+  const clientId =
+    "github_dashboard_" +
+    Math.random().toString(16).substring(2, 10);
 
   // Initialize MQTT Client
   const client = mqtt.connect(broker, {
@@ -177,12 +191,15 @@
   // Connection Event
   client.on("connect", function () {
     const status = document.getElementById("status");
+
     status.textContent = "Connected";
     status.className = "connected";
 
     // Subscribe to topics
     client.subscribe(tempTopic);
+    client.subscribe(humidityTopic);
     client.subscribe(ledStatusTopic);
+
     console.log("Subscribed to MQTT topics");
   });
 
@@ -191,25 +208,49 @@
     const value = message.toString();
     const now = new Date();
 
-    // Route message based on topic
+    // Temperature
     if (topic === tempTopic) {
-      document.getElementById("temperature").innerText = value + " °C";
-      document.getElementById("counter").innerText = value;
-      document.getElementById("updateTime").innerText = now.toLocaleTimeString();
-    } else if (topic === ledStatusTopic) {
-      const ledStatusElem = document.getElementById("ledStatus");
-      ledStatusElem.innerText = value;
-      ledStatusElem.style.color = (value.toUpperCase() === "ON") ? "#10b981" : "#ef4444";
+      document.getElementById("temperature").innerText =
+        value + " °C";
+
+      document.getElementById("updateTime").innerText =
+        now.toLocaleTimeString();
     }
 
-    // Append entry to message history feed
+    // Humidity
+    else if (topic === humidityTopic) {
+      document.getElementById("humidity").innerText =
+        value + " %";
+
+      document.getElementById("humidityUpdateTime").innerText =
+        now.toLocaleTimeString();
+    }
+
+    // LED Status
+    else if (topic === ledStatusTopic) {
+      const ledStatusElem =
+        document.getElementById("ledStatus");
+
+      ledStatusElem.innerText = value;
+
+      ledStatusElem.style.color =
+        (value.toUpperCase() === "ON")
+          ? "#10b981"
+          : "#ef4444";
+    }
+
+    // Append entry to message history
     const history = document.getElementById("history");
+
     if (history.textContent.includes("Waiting for MQTT messages")) {
       history.textContent = "";
     }
 
     const newMessage = document.createElement("div");
-    newMessage.textContent = `${now.toLocaleTimeString()} | ${topic} -> ${value}`;
+
+    newMessage.textContent =
+      `${now.toLocaleTimeString()} | ${topic} -> ${value}`;
+
     history.prepend(newMessage);
   });
 
@@ -217,27 +258,34 @@
   function ledOn() {
     if (client.connected) {
       client.publish(ledCommandTopic, "ON");
-      console.log("Published: ON to " + ledCommandTopic);
+      console.log(
+        "Published: ON to " + ledCommandTopic
+      );
     }
   }
 
   function ledOff() {
     if (client.connected) {
       client.publish(ledCommandTopic, "OFF");
-      console.log("Published: OFF to " + ledCommandTopic);
+      console.log(
+        "Published: OFF to " + ledCommandTopic
+      );
     }
   }
 
   // Connection Error / Offline Handlers
   client.on("error", function (error) {
     console.log("MQTT Error:", error);
+
     const status = document.getElementById("status");
+
     status.textContent = "Connection Error";
     status.className = "disconnected";
   });
 
   client.on("offline", function () {
     const status = document.getElementById("status");
+
     status.textContent = "Disconnected";
     status.className = "disconnected";
   });
@@ -245,3 +293,4 @@
 
 </body>
 </html>
+```
