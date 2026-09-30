@@ -191,7 +191,7 @@
 
   let messageCount = 0;
   const clientId = "github_dashboard_" + Math.random().toString(16).substring(2, 10);
-  const MAX_POINTS = 20;
+  const MAX_POINTS = 5;
 
   // Split Charts Initialization
   const createSingleChart = (elementId, label, color) => new Chart(document.getElementById(elementId), {
@@ -207,10 +207,11 @@
   const humidityChart = createSingleChart('humidityChart', 'Humidity (%)', '#3b82f6');
   const lightChart = createSingleChart('lightChart', 'Light Level', '#f59e0b');
 
-  // Helper to append points to any chart instance
+  // Part C --- Data Buffering
   function pushData(chart, label, value) {
     chart.data.labels.push(label);
     chart.data.datasets[0].data.push(value);
+    //11. Sliding Window
     if (chart.data.labels.length > MAX_POINTS) {
       chart.data.labels.shift();
       chart.data.datasets[0].data.shift();
