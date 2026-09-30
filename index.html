@@ -14,7 +14,329 @@
       font-family: Arial, sans-serif;
       background: #f4f6f8;
       margin: 0;
-      padding-top: 20px;
+      padding-top: 20px;<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>IoT Real-Time Dashboard</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Paho MQTT WebSockets CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+
+  <style>
+    body {
+      background-color: #0f172a;
+      color: #f8fafc;
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+    .card {
+      background-color: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 0.75rem;
+      padding: 1.25rem;
+    }
+  </style>
+</head>
+<body class="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
+
+  <!-- Header & Connection Status -->
+  <header class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-slate-700">
+    <div>
+      <h1 class="text-2xl md:text-3xl font-bold text-white">IoT Real-Time Dashboard</h1>
+      <p class="text-slate-400 text-sm">HiveMQ WebSockets Telemetry Monitor</p>
+    </div>
+    <div class="flex items-center gap-3 card py-2 px-4">
+      <span id="statusDot" class="w-3 h-3 rounded-full bg-yellow-500 animate-pulse"></span>
+      <span id="statusText" class="text-sm font-semibold text-yellow-500">Connecting...</span>
+    </div>
+  </header>
+
+  <!-- Device Metadata & Control Bar -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    
+    <!-- Meta Information -->
+    <div class="card space-y-2">
+      <h2 class="text-lg font-semibold text-slate-300 border-b border-slate-700 pb-2">Device Info</h2>
+      <p class="text-sm">Device: <strong id="deviceId" class="text-cyan-400">Waiting...</strong></p>
+      <p class="text-sm">Message #: <strong id="sequenceNumber" class="text-cyan-400">0</strong></p>
+      <p class="text-sm">ESP32 Uptime: <strong id="deviceUptime" class="text-cyan-400">0 ms</strong></p>
+      <p class="text-sm">Dashboard Counter: <strong id="messageCounter" class="text-cyan-400">0</strong></p>
+      <p class="text-sm">Last Message: <strong id="messageTime" class="text-cyan-400">Waiting for data...</strong></p>
+    </div>
+
+    <!-- Actuator Control -->
+    <div class="card flex flex-col justify-between">
+      <div>
+        <h2 class="text-lg font-semibold text-slate-300 border-b border-slate-700 pb-2">Remote Actuator</h2>
+        <div class="mt-4 flex gap-4">
+          <button onclick="ledOn()" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-4 rounded-lg transition">ON</button>
+          <button onclick="ledOff()" class="flex-1 bg-rose-600 hover:bg-rose-500 text-white font-bold py-2 px-4 rounded-lg transition">OFF</button>
+        </div>
+      </div>
+      <div class="mt-4">
+        <h3 class="text-sm font-medium">
+          LED Status: <span id="ledStatus" class="font-bold text-slate-400">Unknown</span>
+        </h3>
+      </div>
+    </div>
+
+    <!-- Quick Stat Summary -->
+    <div class="card space-y-2">
+      <h2 class="text-lg font-semibold text-slate-300 border-b border-slate-700 pb-2">Sliding Window Config</h2>
+      <p class="text-sm">Max Buffer Size: <strong class="text-amber-400">20 Points</strong></p>
+      <p class="text-sm">Broker Host: <strong class="text-slate-400">broker.hivemq.com</strong></p>
+      <p class="text-sm">WebSocket Port: <strong class="text-slate-400">8884 (SSL)</strong></p>
+      <p class="text-sm">Topic: <strong class="text-slate-400">iot/lab/coh/sensors</strong></p>
+    </div>
+
+  </div>
+
+  <!-- Real-Time Sensor Metric Cards -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+    <!-- Temperature Card -->
+    <div class="card space-y-3">
+      <h2 class="text-lg font-semibold text-rose-400">Temperature</h2>
+      <div id="temperature" class="text-4xl font-extrabold text-white">-- °C</div>
+      <div class="temp-stats text-sm space-y-1 text-slate-300 border-t border-slate-700 pt-2">
+        <p>Current: <strong id="currentTemp" class="text-rose-400">--</strong> °C</p>
+        <p>Minimum: <strong id="minTemp" class="text-slate-200">--</strong> °C</p>
+        <p>Maximum: <strong id="maxTemp" class="text-slate-200">--</strong> °C</p>
+        <p>Average: <strong id="avgTemp" class="text-slate-200">--</strong> °C</p>
+      </div>
+    </div>
+
+    <!-- Humidity Card -->
+    <div class="card space-y-3">
+      <h2 class="text-lg font-semibold text-sky-400">Humidity</h2>
+      <div id="humidity" class="text-4xl font-extrabold text-white">-- %</div>
+      <div class="text-sm text-slate-400 border-t border-slate-700 pt-2">
+        Monitored range: 0% – 100%
+      </div>
+    </div>
+
+    <!-- Light Card -->
+    <div class="card space-y-3">
+      <h2 class="text-lg font-semibold text-amber-400">Light</h2>
+      <div id="light" class="text-4xl font-extrabold text-white">--</div>
+      <div class="text-sm text-slate-400 border-t border-slate-700 pt-2">
+        Analog LDR ADC readout (0 – 1023)
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Chart.js Streaming Visualizations -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div class="card">
+      <h2 class="text-md font-semibold text-rose-400 mb-2">Temperature History</h2>
+      <canvas id="tempChart"></canvas>
+    </div>
+
+    <div class="card">
+      <h2 class="text-md font-semibold text-sky-400 mb-2">Humidity History</h2>
+      <canvas id="humidityChart"></canvas>
+    </div>
+
+    <div class="card">
+      <h2 class="text-md font-semibold text-amber-400 mb-2">Light History</h2>
+      <canvas id="lightChart"></canvas>
+    </div>
+  </div>
+
+  <!-- MQTT & Dashboard Application Logic -->
+  <script>
+    // Configuration
+    const MQTT_HOST = "broker.hivemq.com";
+    const MQTT_PORT = 8884; // Secure WebSockets Port
+    const MQTT_TOPIC_SENSORS = "iot/lab/coh/sensors";
+    const MQTT_TOPIC_LED_SET = "iot/lab/led/set";
+    const MQTT_TOPIC_LED_STATUS = "iot/lab/led/status";
+
+    const MAX_POINTS = 20;
+
+    // Sliding Window Data Buffers
+    let tempHistory = [];
+    let humidityHistory = [];
+    let lightHistory = [];
+    let dashboardMsgCount = 0;
+
+    // --- CHART.JS INITIALIZATION ---
+    function createChartConfig(label, color) {
+      return {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [{
+            label: label,
+            data: [],
+            borderColor: color,
+            backgroundColor: color + '22',
+            borderWidth: 2,
+            tension: 0.2,
+            fill: true
+          }]
+        },
+        options: {
+          responsive: true,
+          animation: false,
+          scales: {
+            x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+            y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
+          },
+          plugins: { legend: { display: false } }
+        }
+      };
+    }
+
+    const tempChart = new Chart(document.getElementById('tempChart'), createChartConfig('Temperature (°C)', '#f43f5e'));
+    const humidityChart = new Chart(document.getElementById('humidityChart'), createChartConfig('Humidity (%)', '#38bdf8'));
+    const lightChart = new Chart(document.getElementById('lightChart'), createChartConfig('Light Level', '#fbbf24'));
+
+    // --- MQTT PAHO CLIENT SETUP ---
+    const clientId = "Dashboard-" + Math.random().toString(16).substr(2, 8);
+    const client = new Paho.MQTT.Client(MQTT_HOST, MQTT_PORT, clientId);
+
+    client.onConnectionLost = function (responseObject) {
+      document.getElementById('statusDot').className = "w-3 h-3 rounded-full bg-rose-500";
+      document.getElementById('statusText').innerText = "Disconnected";
+      document.getElementById('statusText').className = "text-sm font-semibold text-rose-500";
+      setTimeout(connectMQTT, 3000);
+    };
+
+    client.onMessageArrived = function (message) {
+      if (message.destinationName === MQTT_TOPIC_LED_STATUS) {
+        handleLedStatus(message.payloadString);
+        return;
+      }
+
+      try {
+        const payload = JSON.parse(message.payloadString);
+
+        // Update Metadata
+        if (payload.device) document.getElementById("deviceId").innerText = payload.device;
+        if (payload.sequence !== undefined) document.getElementById("sequenceNumber").innerText = payload.sequence;
+        if (payload.timestamp !== undefined) document.getElementById("deviceUptime").innerText = payload.timestamp + " ms";
+
+        dashboardMsgCount++;
+        document.getElementById("messageCounter").innerText = dashboardMsgCount;
+
+        const displayTime = payload.time || new Date().toLocaleTimeString();
+        document.getElementById("messageTime").innerText = displayTime;
+
+        // Process Telemetry
+        if (payload.sensors) {
+          const temp = parseFloat(payload.sensors.temperature);
+          const hum = parseFloat(payload.sensors.humidity);
+          const light = parseInt(payload.sensors.light);
+
+          // Card Displays
+          document.getElementById("temperature").innerText = temp.toFixed(1) + " °C";
+          document.getElementById("humidity").innerText = hum.toFixed(1) + " %";
+          document.getElementById("light").innerText = light;
+
+          // Buffer Management (Push & Shift)
+          tempHistory.push(temp);
+          humidityHistory.push(hum);
+          lightHistory.push(light);
+
+          if (tempHistory.length > MAX_POINTS) tempHistory.shift();
+          if (humidityHistory.length > MAX_POINTS) humidityHistory.shift();
+          if (lightHistory.length > MAX_POINTS) lightHistory.shift();
+
+          // Update Stats
+          updateTemperatureStats(temp);
+
+          // Update Charts
+          pushToChart(tempChart, displayTime, temp);
+          pushToChart(humidityChart, displayTime, hum);
+          pushToChart(lightChart, displayTime, light);
+        }
+      } catch (e) {
+        console.error("Payload Parse Error:", e);
+      }
+    };
+
+    function connectMQTT() {
+      client.connect({
+        useSSL: true,
+        onSuccess: function () {
+          document.getElementById('statusDot').className = "w-3 h-3 rounded-full bg-emerald-500";
+          document.getElementById('statusText').innerText = "Connected";
+          document.getElementById('statusText').className = "text-sm font-semibold text-emerald-500";
+
+          client.subscribe(MQTT_TOPIC_SENSORS);
+          client.subscribe(MQTT_TOPIC_LED_STATUS);
+        },
+        onFailure: function (err) {
+          document.getElementById('statusDot').className = "w-3 h-3 rounded-full bg-rose-500";
+          document.getElementById('statusText').innerText = "Connection Failed";
+          document.getElementById('statusText').className = "text-sm font-semibold text-rose-500";
+          setTimeout(connectMQTT, 5000);
+        }
+      });
+    }
+
+    // --- HELPER FUNCTIONS ---
+    function updateTemperatureStats(currentVal) {
+      if (tempHistory.length === 0) return;
+
+      const min = Math.min(...tempHistory);
+      const max = Math.max(...tempHistory);
+      const sum = tempHistory.reduce((acc, val) => acc + val, 0);
+      const avg = sum / tempHistory.length;
+
+      document.getElementById("currentTemp").innerText = currentVal.toFixed(1);
+      document.getElementById("minTemp").innerText = min.toFixed(1);
+      document.getElementById("maxTemp").innerText = max.toFixed(1);
+      document.getElementById("avgTemp").innerText = avg.toFixed(1);
+    }
+
+    function pushToChart(chart, label, value) {
+      chart.data.labels.push(label);
+      chart.data.datasets[0].data.push(value);
+
+      if (chart.data.labels.length > MAX_POINTS) {
+        chart.data.labels.shift();
+        chart.data.datasets[0].data.shift();
+      }
+
+      chart.update("none");
+    }
+
+    function ledOn() {
+      const msg = new Paho.MQTT.Message("ON");
+      msg.destinationName = MQTT_TOPIC_LED_SET;
+      client.send(msg);
+    }
+
+    function ledOff() {
+      const msg = new Paho.MQTT.Message("OFF");
+      msg.destinationName = MQTT_TOPIC_LED_SET;
+      client.send(msg);
+    }
+
+    function handleLedStatus(statusMessage) {
+      const ledElem = document.getElementById("ledStatus");
+      if (statusMessage === "ON") {
+        ledElem.innerText = "ON";
+        ledElem.className = "font-bold text-emerald-400";
+      } else if (statusMessage === "OFF") {
+        ledElem.innerText = "OFF";
+        ledElem.className = "font-bold text-rose-400";
+      }
+    }
+
+    // Startup
+    window.addEventListener('load', connectMQTT);
+  </script>
+</body>
+</html>
       text-align: center;
     }
 
