@@ -72,10 +72,10 @@
     }
 
     button {
-      font-size: 18px;
+      font-size: 16px;
       font-weight: bold;
-      padding: 12px 25px;
-      margin: 10px;
+      padding: 10px 20px;
+      margin: 5px;
       border: none;
       border-radius: 6px;
       cursor: pointer;
@@ -99,7 +99,7 @@
       border: 1px solid #e5e7eb;
     }
 
-    canvas { max-height: 320px; }
+    canvas { max-height: 250px; }
 
     @media (max-width: 700px) {
       .sensor-container { flex-direction: column; }
@@ -111,7 +111,7 @@
 
 <header>
   <h1>ESP32 MQTT Dashboard</h1>
-  <p>GitHub Pages + MQTT Control + Multi-Variable Telemetry</p>
+  <p>GitHub Pages + MQTT Control + Split Telemetry Charts</p>
 </header>
 
 <div class="container">
@@ -123,7 +123,7 @@
     <p>Sensor Topic: <span id="topicName" class="topic">iot/lab/coh/sensors</span></p>
   </div>
 
-  <!-- Live Numeric Sensor Readouts -->
+  <!-- Live Sensor Readouts -->
   <div class="sensor-container">
     <div class="sensor-card">
       <h2>Temperature</h2>
@@ -141,13 +141,23 @@
     </div>
   </div>
 
-  <!-- Fused Telemetry Chart -->
-  <div class="card">
-    <h2>Live Telemetry (Fused View)</h2>
-    <canvas id="fusedChart"></canvas>
+  <!-- 3 Separate Charts -->
+  <div id="splitChartSection">
+    <div class="card">
+      <h2>Temperature History</h2>
+      <canvas id="tempChart"></canvas>
+    </div>
+    <div class="card">
+      <h2>Humidity History</h2>
+      <canvas id="humidityChart"></canvas>
+    </div>
+    <div class="card">
+      <h2>Light History</h2>
+      <canvas id="lightChart"></canvas>
+    </div>
   </div>
 
-  <!-- Message Metadata -->
+  <!-- Message Information -->
   <div class="card">
     <h2>Message Information</h2>
     <p>Device: <strong id="deviceId">Waiting...</strong></p>
@@ -157,7 +167,7 @@
     <p>Last Message: <strong id="messageTime">Waiting for data...</strong></p>
   </div>
 
-  <!-- LED Remote Control -->
+  <!-- LED Control -->
   <div class="card">
     <h2>LED Control</h2>
     <button class="btn-on" onclick="ledOn()">ON</button>
@@ -165,7 +175,7 @@
     <h3>LED Status: <span id="ledStatus" style="color: #6b7280;">Unknown</span></h3>
   </div>
 
-  <!-- Raw Log History -->
+  <!-- Message History -->
   <div class="card">
     <h2>Message History</h2>
     <div id="history">Waiting for MQTT messages...</div>
@@ -183,82 +193,32 @@
   const clientId = "github_dashboard_" + Math.random().toString(16).substring(2, 10);
   const MAX_POINTS = 20;
 
-  // Initialize Fused Chart with Dual Y-Axes
-  const fusedChart = new Chart(document.getElementById('fusedChart'), {
+  // Split Charts Initialization
+  const createSingleChart = (elementId, label, color) => new Chart(document.getElementById(elementId), {
     type: 'line',
-    data: {
-      labels: [],
-      datasets: [
-        { 
-          label: 'Temp (°C)', 
-          data: [], 
-          borderColor: '#ef4444', 
-          backgroundColor: 'rgba(239, 68, 68, 0.1)', 
-          fill: true, 
-          tension: 0.3,
-          yAxisID: 'y'
-        },
-        { 
-          label: 'Humidity (%)', 
-          data: [], 
-          borderColor: '#3b82f6', 
-          backgroundColor: 'rgba(59, 130, 246, 0.1)', 
-          fill: true, 
-          tension: 0.3,
-          yAxisID: 'y'
-        },
-        { 
-          label: 'Light Level', 
-          data: [], 
-          borderColor: '#f59e0b', 
-          backgroundColor: 'rgba(245, 158, 11, 0.1)', 
-          fill: true, 
-          tension: 0.3,
-          yAxisID: 'y1'
-        }
-      ]
+    data: { 
+      labels: [], 
+      datasets: [{ label: label, data: [], borderColor: color, backgroundColor: color + '22', fill: true, tension: 0.3 }] 
     },
-    options: { 
-      responsive: true, 
-      animation: false, 
-      scales: { 
-        y: { 
-          type: 'linear',
-          display: true,
-          position: 'left',
-          title: { display: true, text: 'Temp (°C) / Humidity (%)' },
-          beginAtZero: false 
-        },
-        y1: { 
-          type: 'linear',
-          display: true,
-          position: 'right',
-          title: { display: true, text: 'Light Level' },
-          grid: { drawOnChartArea: false },
-          beginAtZero: true 
-        }
-      } 
-    }
+    options: { responsive: true, animation: false, scales: { y: { beginAtZero: false } } }
   });
 
-  // Helper to push new data to specific dataset index
-  function pushData(timeLabel, tempVal, humVal, lightVal) {
-    if (fusedChart.data.labels.length >= MAX_POINTS) {
-      fusedChart.data.labels.shift();
-      fusedChart.data.datasets[0].data.shift(); // Temp
-      fusedChart.data.datasets[1].data.shift(); // Humidity
-      fusedChart.data.datasets[2].data.shift(); // Light
-    }
+  const tempChart = createSingleChart('tempChart', 'Temperature (°C)', '#ef4444');
+  const humidityChart = createSingleChart('humidityChart', 'Humidity (%)', '#3b82f6');
+  const lightChart = createSingleChart('lightChart', 'Light Level', '#f59e0b');
 
-    fusedChart.data.labels.push(timeLabel);
-    fusedChart.data.datasets[0].data.push(tempVal);
-    fusedChart.data.datasets[1].data.push(humVal);
-    fusedChart.data.datasets[2].data.push(lightVal);
-    
-    fusedChart.update();
+  // Helper to append points to any chart instance
+  function pushData(chart, label, value) {
+    chart.data.labels.push(label);
+    chart.data.datasets[0].data.push(value);
+    if (chart.data.labels.length > MAX_POINTS) {
+      chart.data.labels.shift();
+      chart.data.datasets[0].data.shift();
+    }
+    chart.update();
   }
 
-  // Connect to MQTT Broker
+  // MQTT Setup
   const client = mqtt.connect(broker, { clientId: clientId, clean: true });
 
   client.on("connect", function() {
@@ -287,22 +247,26 @@
           document.getElementById("deviceUptime").innerText = `${data.timestamp} ms (${(data.timestamp/1000).toFixed(1)}s)`;
         }
 
-        // Parse nested JSON from ESP32
         if (data.sensors) {
           const temp = data.sensors.temperature;
           const hum = data.sensors.humidity;
           const light = data.sensors.light;
 
-          // Update text readouts
-          if (typeof temp === "number") document.getElementById("temperature").innerText = temp + " °C";
-          if (typeof hum === "number") document.getElementById("humidity").innerText = hum + " %";
-          if (typeof light === "number") document.getElementById("light").innerText = light;
-
-          // Push all values to the single fused chart
-          pushData(timeString, temp, hum, light);
+          if (typeof temp === "number") {
+            document.getElementById("temperature").innerText = temp + " °C";
+            pushData(tempChart, timeString, temp);
+          }
+          if (typeof hum === "number") {
+            document.getElementById("humidity").innerText = hum + " %";
+            pushData(humidityChart, timeString, hum);
+          }
+          if (typeof light === "number") {
+            document.getElementById("light").innerText = light;
+            pushData(lightChart, timeString, light);
+          }
         }
       } catch (error) {
-        console.warn("Invalid JSON structure received:", value, error);
+        console.warn("Invalid JSON:", value, error);
       }
     } else if (topic === ledStatusTopic) {
       const ledStatusElem = document.getElementById("ledStatus");
@@ -310,7 +274,6 @@
       ledStatusElem.style.color = (value.toUpperCase() === "ON") ? "#10b981" : "#ef4444";
     }
 
-    // Append raw telemetry message to scrollable terminal
     const history = document.getElementById("history");
     if (history.textContent.includes("Waiting for MQTT messages")) history.textContent = "";
     const newMessage = document.createElement("div");
@@ -318,7 +281,6 @@
     history.prepend(newMessage);
   });
 
-  // Remote LED Publisher Functions
   function ledOn() { if (client.connected) client.publish(ledCommandTopic, "ON"); }
   function ledOff() { if (client.connected) client.publish(ledCommandTopic, "OFF"); }
 </script>
