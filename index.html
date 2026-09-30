@@ -152,13 +152,13 @@
     <button class="btn-toggle" onclick="showSplitView()">Split Charts View</button>
   </div>
 
-  <!-- OPTION A: Fused Chart Container -->
+  <!-- Fused Chart Container -->
   <div id="fusedChartSection" class="card">
     <h2>Live Telemetry (Fused Chart)</h2>
     <canvas id="fusedChart"></canvas>
   </div>
 
-  <!-- OPTION B: Split Charts Container -->
+  <!-- Split Charts Container -->
   <div id="splitChartSection" class="hidden">
     <div class="card">
       <h2>Temperature History</h2>
@@ -217,7 +217,8 @@
       labels: [],
       datasets: [
         { label: 'Temp (°C)', data: [], borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', fill: true, tension: 0.3 },
-        { label: 'Humidity (%)', data: [], borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', fill: true, tension: 0.3 }
+        { label: 'Humidity (%)', data: [], borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', fill: true, tension: 0.3 },
+        { label: 'Light Level', data: [], borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.1)', fill: true, tension: 0.3 }
       ]
     },
     options: { responsive: true, animation: false, scales: { y: { beginAtZero: false } } }
