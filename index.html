@@ -3,11 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ESP32 MQTT Dashboard</title>
+  <title>ESP32 MQTT Dashboard with Chart.js</title>
 
-  <!-- MQTT.js CDN -->
+  <!-- MQTT.js & Chart.js CDNs -->
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-
+  <!-- lab4 -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- lab4 -->
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -108,7 +110,7 @@
 
 <header>
   <h1>ESP32 MQTT Dashboard</h1>
-  <p>GitHub Pages + MQTT Control</p>
+  <p>GitHub Pages + MQTT Control + Real-time Charting</p>
 </header>
 
 <div class="container">
@@ -138,6 +140,13 @@
     </div>
   </div>
 
+  <!-- Real-time Chart Lab4 -->
+  <div class="card">        
+    <h2>Live Telemetry Chart</h2>
+    <canvas id="sensorChart" width="400" height="180"></canvas>
+  </div>
+ <!-- Real-time Chart Lab4 -->
+  
   <!-- Message Information -->
   <div class="card">
     <h2>Message Information</h2>
@@ -173,6 +182,56 @@
   let messageCount = 0;
   const clientId = "github_dashboard_" + Math.random().toString(16).substring(2, 10);
 
+  // Initialize Chart.js lab4
+  const MAX_DATA_POINTS = 20;
+  const ctx = document.getElementById('sensorChart').getContext('2d');
+  const sensorChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [
+        {
+          label: 'Temperature (°C)',
+          data: [],
+          borderColor: '#ef4444',
+          backgroundColor: 'rgba(239, 68, 68, 0.1)',
+          tension: 0.3,
+          fill: true
+        },
+        {
+          label: 'Humidity (%)',
+          data: [],
+          borderColor: '#3b82f6',
+          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+          tension: 0.3,
+          fill: true
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        x: { title: { display: true, text: 'Time' } },
+        y: { beginAtZero: false }
+      }
+    }
+  });
+
+  function updateChart(timeLabel, temp, hum) {
+    sensorChart.data.labels.push(timeLabel);
+    sensorChart.data.datasets[0].data.push(temp);
+    sensorChart.data.datasets[1].data.push(hum);
+
+    if (sensorChart.data.labels.length > MAX_DATA_POINTS) {
+      sensorChart.data.labels.shift();
+      sensorChart.data.datasets[0].data.shift();
+      sensorChart.data.datasets[1].data.shift();
+    }
+  // Initialize Chart.js lab4
+    
+    sensorChart.update();
+  }
+
   const client = mqtt.connect(broker, {
     clientId: clientId,
     clean: true,
@@ -192,10 +251,11 @@
   client.on("message", function(topic, message) {
     const value = message.toString();
     const now = new Date();
+    const timeString = now.toLocaleTimeString();
 
     messageCount++;
     document.getElementById("messageCounter").innerText = messageCount;
-    document.getElementById("messageTime").innerText = now.toLocaleTimeString();
+    document.getElementById("messageTime").innerText = timeString;
 
     if (topic === sensorTopic) {
       try {
@@ -216,14 +276,23 @@
         }
 
         if (data.sensors) {
-          if (typeof data.sensors.temperature === "number") {
-            document.getElementById("temperature").innerText = data.sensors.temperature + " °C";
+          const temp = data.sensors.temperature;
+          const hum = data.sensors.humidity;
+          const light = data.sensors.light;
+
+          if (typeof temp === "number") {
+            document.getElementById("temperature").innerText = temp + " °C";
           }
-          if (typeof data.sensors.humidity === "number") {
-            document.getElementById("humidity").innerText = data.sensors.humidity + " %";
+          if (typeof hum === "number") {
+            document.getElementById("humidity").innerText = hum + " %";
           }
-          if (typeof data.sensors.light === "number") {
-            document.getElementById("light").innerText = data.sensors.light;
+          if (typeof light === "number") {
+            document.getElementById("light").innerText = light;
+          }
+
+          // Push new points to Chart.js
+          if (typeof temp === "number" && typeof hum === "number") {
+            updateChart(timeString, temp, hum);
           }
         }
 
@@ -243,7 +312,7 @@
     }
 
     const newMessage = document.createElement("div");
-    newMessage.textContent = `${now.toLocaleTimeString()} | ${topic} -> ${value}`;
+    newMessage.textContent = `${timeString} | ${topic} -> ${value}`;
     history.prepend(newMessage);
   });
 
