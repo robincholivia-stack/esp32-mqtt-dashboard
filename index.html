@@ -3,13 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ESP32 MQTT Dashboard with Chart.js</title>
+  <title>Lab 4 IoT Dashboard</title>
 
   <!-- MQTT.js & Chart.js CDNs -->
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-  <!-- lab4 -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- lab4 -->
+
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -73,15 +72,18 @@
     }
 
     button {
-      font-size: 18px;
+      font-size: 16px;
       font-weight: bold;
-      padding: 12px 25px;
-      margin: 10px;
+      padding: 10px 20px;
+      margin: 5px;
       border: none;
       border-radius: 6px;
       cursor: pointer;
       transition: background 0.2s;
     }
+
+    .btn-toggle { background-color: #3b82f6; color: white; }
+    .btn-toggle:hover { background-color: #2563eb; }
 
     .btn-on { background-color: #10b981; color: white; }
     .btn-on:hover { background-color: #059669; }
@@ -100,6 +102,10 @@
       border: 1px solid #e5e7eb;
     }
 
+    canvas { max-height: 250px; }
+
+    .hidden { display: none !important; }
+
     @media (max-width: 700px) {
       .sensor-container { flex-direction: column; }
     }
@@ -110,7 +116,7 @@
 
 <header>
   <h1>ESP32 MQTT Dashboard</h1>
-  <p>GitHub Pages + MQTT Control + Real-time Charting</p>
+  <p>GitHub Pages + MQTT Control + Multi-View Charting</p>
 </header>
 
 <div class="container">
@@ -140,13 +146,34 @@
     </div>
   </div>
 
-  <!-- Real-time Chart Lab4 -->
-  <div class="card">        
-    <h2>Live Telemetry Chart</h2>
-    <canvas id="sensorChart" width="400" height="180"></canvas>
+  <!-- View Switcher -->
+  <div style="margin-bottom: 20px;">
+    <button class="btn-toggle" onclick="showFusedView()">Fused Chart View</button>
+    <button class="btn-toggle" onclick="showSplitView()">Split Charts View</button>
   </div>
- <!-- Real-time Chart Lab4 -->
-  
+
+  <!-- OPTION A: Fused Chart Container -->
+  <div id="fusedChartSection" class="card">
+    <h2>Live Telemetry (Fused Chart)</h2>
+    <canvas id="fusedChart"></canvas>
+  </div>
+
+  <!-- OPTION B: Split Charts Container -->
+  <div id="splitChartSection" class="hidden">
+    <div class="card">
+      <h2>Temperature History</h2>
+      <canvas id="tempChart"></canvas>
+    </div>
+    <div class="card">
+      <h2>Humidity History</h2>
+      <canvas id="humidityChart"></canvas>
+    </div>
+    <div class="card">
+      <h2>Light History</h2>
+      <canvas id="lightChart"></canvas>
+    </div>
+  </div>
+
   <!-- Message Information -->
   <div class="card">
     <h2>Message Information</h2>
@@ -181,77 +208,68 @@
 
   let messageCount = 0;
   const clientId = "github_dashboard_" + Math.random().toString(16).substring(2, 10);
+  const MAX_POINTS = 20;
 
-  // Initialize Chart.js lab4
-  const MAX_DATA_POINTS = 20;
-  const ctx = document.getElementById('sensorChart').getContext('2d');
-  const sensorChart = new Chart(ctx, {
+  // 1. FUSED CHART INITIALIZATION
+  const fusedChart = new Chart(document.getElementById('fusedChart'), {
     type: 'line',
     data: {
       labels: [],
       datasets: [
-        {
-          label: 'Temperature (°C)',
-          data: [],
-          borderColor: '#ef4444',
-          backgroundColor: 'rgba(239, 68, 68, 0.1)',
-          tension: 0.3,
-          fill: true
-        },
-        {
-          label: 'Humidity (%)',
-          data: [],
-          borderColor: '#3b82f6',
-          backgroundColor: 'rgba(59, 130, 246, 0.1)',
-          tension: 0.3,
-          fill: true
-        }
+        { label: 'Temp (°C)', data: [], borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', fill: true, tension: 0.3 },
+        { label: 'Humidity (%)', data: [], borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', fill: true, tension: 0.3 }
       ]
     },
-    options: {
-      responsive: true,
-      scales: {
-        x: { title: { display: true, text: 'Time' } },
-        y: { beginAtZero: false }
-      }
-    }
+    options: { responsive: true, animation: false, scales: { y: { beginAtZero: false } } }
   });
 
-  function updateChart(timeLabel, temp, hum) {
-    sensorChart.data.labels.push(timeLabel);
-    sensorChart.data.datasets[0].data.push(temp);
-    sensorChart.data.datasets[1].data.push(hum);
+  // 2. SPLIT CHARTS INITIALIZATION
+  const createSingleChart = (elementId, label, color) => new Chart(document.getElementById(elementId), {
+    type: 'line',
+    data: { labels: [], datasets: [{ label: label, data: [], borderColor: color, backgroundColor: color + '22', fill: true, tension: 0.3 }] },
+    options: { responsive: true, animation: false, scales: { y: { beginAtZero: false } } }
+  });
 
-    if (sensorChart.data.labels.length > MAX_DATA_POINTS) {
-      sensorChart.data.labels.shift();
-      sensorChart.data.datasets[0].data.shift();
-      sensorChart.data.datasets[1].data.shift();
+  const tempChart = createSingleChart('tempChart', 'Temperature (°C)', '#ef4444');
+  const humidityChart = createSingleChart('humidityChart', 'Humidity (%)', '#3b82f6');
+  const lightChart = createSingleChart('lightChart', 'Light Level', '#f59e0b');
+
+  // Helper to append points to any chart instance
+  function pushData(chart, label, value, datasetIndex = 0) {
+    chart.data.labels.push(label);
+    chart.data.datasets[datasetIndex].data.push(value);
+    if (chart.data.labels.length > MAX_POINTS) {
+      chart.data.labels.shift();
+      chart.data.datasets[datasetIndex].data.shift();
     }
-  // Initialize Chart.js lab4
-    
-    sensorChart.update();
+    chart.update();
   }
 
-  const client = mqtt.connect(broker, {
-    clientId: clientId,
-    clean: true,
-    connectTimeout: 4000,
-    reconnectPeriod: 2000
-  });
+  // Toggle UI Views
+  function showFusedView() {
+    document.getElementById('fusedChartSection').classList.remove('hidden');
+    document.getElementById('splitChartSection').classList.add('hidden');
+  }
+
+  function showSplitView() {
+    document.getElementById('splitChartSection').classList.remove('hidden');
+    document.getElementById('fusedChartSection').classList.add('hidden');
+  }
+
+  // MQTT Setup
+  const client = mqtt.connect(broker, { clientId: clientId, clean: true });
 
   client.on("connect", function() {
     const status = document.getElementById("status");
     status.textContent = "Connected";
     status.className = "connected";
-
     client.subscribe(sensorTopic);
     client.subscribe(ledStatusTopic);
   });
 
   client.on("message", function(topic, message) {
     const value = message.toString();
-    const now = new Date();
-    const timeString = now.toLocaleTimeString();
+    const timeString = new Date().toLocaleTimeString();
 
     messageCount++;
     document.getElementById("messageCounter").innerText = messageCount;
@@ -260,19 +278,11 @@
     if (topic === sensorTopic) {
       try {
         const data = JSON.parse(value);
-        clearJsonError();
 
-        if (data.device) {
-          document.getElementById("deviceId").innerText = data.device;
-        }
-
-        if (typeof data.sequence === "number") {
-          document.getElementById("sequenceNumber").innerText = data.sequence;
-        }
-
+        if (data.device) document.getElementById("deviceId").innerText = data.device;
+        if (typeof data.sequence === "number") document.getElementById("sequenceNumber").innerText = data.sequence;
         if (typeof data.timestamp === "number") {
-          const uptimeSeconds = (data.timestamp / 1000).toFixed(1);
-          document.getElementById("deviceUptime").innerText = `${data.timestamp} ms (${uptimeSeconds}s)`;
+          document.getElementById("deviceUptime").innerText = `${data.timestamp} ms (${(data.timestamp/1000).toFixed(1)}s)`;
         }
 
         if (data.sensors) {
@@ -282,23 +292,21 @@
 
           if (typeof temp === "number") {
             document.getElementById("temperature").innerText = temp + " °C";
+            pushData(tempChart, timeString, temp);
+            pushData(fusedChart, timeString, temp, 0); // Dataset 0 = Temp
           }
           if (typeof hum === "number") {
             document.getElementById("humidity").innerText = hum + " %";
+            pushData(humidityChart, timeString, hum);
+            pushData(fusedChart, timeString, hum, 1);  // Dataset 1 = Humidity
           }
           if (typeof light === "number") {
             document.getElementById("light").innerText = light;
-          }
-
-          // Push new points to Chart.js
-          if (typeof temp === "number" && typeof hum === "number") {
-            updateChart(timeString, temp, hum);
+            pushData(lightChart, timeString, light);
           }
         }
-
       } catch (error) {
-        console.warn("Invalid JSON format received:", value, error);
-        showJsonError(value);
+        console.warn("Invalid JSON:", value, error);
       }
     } else if (topic === ledStatusTopic) {
       const ledStatusElem = document.getElementById("ledStatus");
@@ -307,58 +315,14 @@
     }
 
     const history = document.getElementById("history");
-    if (history.textContent.includes("Waiting for MQTT messages")) {
-      history.textContent = "";
-    }
-
+    if (history.textContent.includes("Waiting for MQTT messages")) history.textContent = "";
     const newMessage = document.createElement("div");
     newMessage.textContent = `${timeString} | ${topic} -> ${value}`;
     history.prepend(newMessage);
   });
 
-  function showJsonError(rawPayload) {
-    let errorBanner = document.getElementById("jsonErrorBanner");
-    if (!errorBanner) {
-      errorBanner = document.createElement("div");
-      errorBanner.id = "jsonErrorBanner";
-      errorBanner.style.cssText = "background: #fee2e2; color: #991b1b; padding: 12px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #f87171; font-weight: bold;";
-      const container = document.querySelector(".container");
-      container.insertBefore(errorBanner, container.firstChild);
-    }
-    errorBanner.innerText = `⚠️ Malformed message received: "${rawPayload}" (Ignored parsing)`;
-  }
-
-  function clearJsonError() {
-    const errorBanner = document.getElementById("jsonErrorBanner");
-    if (errorBanner) {
-      errorBanner.remove();
-    }
-  }
-
-  function ledOn() {
-    if (client.connected) {
-      client.publish(ledCommandTopic, "ON");
-    }
-  }
-
-  function ledOff() {
-    if (client.connected) {
-      client.publish(ledCommandTopic, "OFF");
-    }
-  }
-
-  client.on("error", function(error) {
-    console.error("MQTT Error:", error);
-    const status = document.getElementById("status");
-    status.textContent = "Connection Error";
-    status.className = "disconnected";
-  });
-
-  client.on("offline", function() {
-    const status = document.getElementById("status");
-    status.textContent = "Disconnected";
-    status.className = "disconnected";
-  });
+  function ledOn() { if (client.connected) client.publish(ledCommandTopic, "ON"); }
+  function ledOff() { if (client.connected) client.publish(ledCommandTopic, "OFF"); }
 </script>
 
 </body>
